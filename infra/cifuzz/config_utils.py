@@ -125,6 +125,7 @@ class BaseConfig:
     self.git_store_branch = os.environ.get('GIT_STORE_BRANCH')
     self.git_store_branch_coverage = os.environ.get('GIT_STORE_BRANCH_COVERAGE',
                                                     self.git_store_branch)
+    self.builds_storage = os.getenv('BUILDS_STORAGE')
 
     # TODO(metzman): Fix tests to create valid configurations and get rid of
     # CIFUZZ_TEST here and in presubmit.py.
@@ -140,6 +141,10 @@ class BaseConfig:
       logging.error('Must set OSS_FUZZ_PROJECT_NAME if OSS-Fuzz user. '
                     'Otherwise must set BUILD_INTEGRATION_PATH. '
                     'Neither is set.')
+      return False
+
+    if self.builds_storage and self.builds_storage != 'GITHUB_ARTIFACT':
+      logging.error('Only "GITHUB_ARTIFACT" is supported for builds-storage.')
       return False
 
     if not self.workspace:
