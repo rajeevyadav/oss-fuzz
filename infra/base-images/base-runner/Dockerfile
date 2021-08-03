@@ -37,18 +37,45 @@ COPY --from=base-clang /usr/local/bin/llvm-cov \
 
 RUN apt-get update && apt-get install -y \
     binutils \
+    ca-certificates \
     file \
     fonts-dejavu \
     git \
     lib32gcc1 \
     libc6-i386 \
     libcap2 \
-    python3 \
-    python3-pip \
-    python3-setuptools \
     unzip \
     wget \
     zip --no-install-recommends
+
+# Build and install latest Python 3 (3.8.3).
+ENV PYTHON_VERSION 3.8.3
+RUN export PYTHON_DEPS="\
+        build-essential \
+        zlib1g-dev \
+        libncurses5-dev \
+        libgdbm-dev \
+        libnss3-dev \
+        libssl-dev \
+        libsqlite3-dev \
+        libreadline-dev \
+        libffi-dev \
+        libbz2-dev \
+        liblzma-dev" && \
+    unset CFLAGS CXXFLAGS && \
+    apt-get install -y $PYTHON_DEPS && \
+    cd /tmp && \
+    wget https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tgz && \
+    tar -xzf Python-$PYTHON_VERSION.tgz && \
+    cd Python-$PYTHON_VERSION && \
+    ./configure --enable-optimizations --enable-shared && \
+    make -j install && \
+    ldconfig && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    cd .. && \
+    rm -r /tmp/Python-$PYTHON_VERSION.tgz /tmp/Python-$PYTHON_VERSION && \
+    rm -rf /usr/local/lib/python3.8/test && \
+    apt-get remove --auto-remove -y $PYTHON_DEPS # https://github.com/google/oss-fuzz/issues/3888
 
 RUN git clone https://chromium.googlesource.com/chromium/src/tools/code_coverage /opt/code_coverage && \
     cd /opt/code_coverage && \
@@ -102,6 +129,9 @@ RUN wget https://repo1.maven.org/maven2/org/jacoco/org.jacoco.cli/0.8.7/org.jaco
     echo "37df187b76888101ecd745282e9cd1ad4ea508d6  /opt/jacoco-agent.jar" | shasum --check && \
     echo "c1814e7bba5fd8786224b09b43c84fd6156db690  /opt/jacoco-cli.jar" | shasum --check
 
+# Install libClusterFuzz, which is used for running fuzzers.
+RUN python3 -m pip install clusterfuzz
+
 # Do this last to make developing these files easier/faster due to caching.
 COPY bad_build_check \
     collect_dft \
@@ -113,7 +143,6 @@ COPY bad_build_check \
     rcfilt \
     reproduce \
     run_fuzzer \
-    parse_options.py \
     targets_list \
     test_all.py \
     test_one.py \
